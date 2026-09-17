@@ -1,0 +1,57 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.database.database import Base, engine
+
+# Import models so SQLAlchemy knows about all tables
+from app.models.donor import Donor
+from app.models.blood_request import BloodRequest
+from app.models.notification import Notification
+
+from app.routers import donors, requests, notifications
+
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
+
+
+app = FastAPI(
+    title="BloodBridge API"
+)
+
+
+# ---------------------------------------------------------
+# CORS
+# ---------------------------------------------------------
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ---------------------------------------------------------
+# Routers
+# ---------------------------------------------------------
+
+app.include_router(donors.router)
+app.include_router(requests.router)
+app.include_router(notifications.router)
+
+
+# ---------------------------------------------------------
+# Home
+# ---------------------------------------------------------
+
+@app.get("/")
+def home():
+    return {
+        "message": "Welcome to BloodBridge",
+        "status": "API is running"
+    }
