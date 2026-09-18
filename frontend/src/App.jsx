@@ -1,34 +1,78 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./index.css";
 
 import {
   createDonor,
   createBloodRequest,
-  getDashboard,
+  getMyDashboard,
   acceptNotification,
+  loginUser,
+  registerUser,
+  refreshAccessToken,
+  logoutUser,
 } from "./api";
 
 
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Blood request modal
+  // ==================================================
+  // AUTHENTICATION
+  // ==================================================
+
+  const [currentUser, setCurrentUser] = useState(null);
+
+  const [showAuthForm, setShowAuthForm] = useState(false);
+  const [authMode, setAuthMode] = useState("login");
+
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [authSuccess, setAuthSuccess] = useState("");
+
+  const [authData, setAuthData] = useState({
+    full_name: "",
+    email: "",
+    password: "",
+    role: "donor",
+  });
+
+  // Action user wanted before login
+  const [pendingAction, setPendingAction] = useState(null);
+
+
+  // ==================================================
+  // BLOOD REQUEST MODAL
+  // ==================================================
+
   const [showRequestForm, setShowRequestForm] = useState(false);
 
-  // Donor registration modal
+
+  // ==================================================
+  // DONOR REGISTRATION MODAL
+  // ==================================================
+
   const [showDonorForm, setShowDonorForm] = useState(false);
 
-  // Donor dashboard
+
+  // ==================================================
+  // DONOR DASHBOARD
+  // ==================================================
+
   const [showDashboard, setShowDashboard] = useState(false);
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [dashboardError, setDashboardError] = useState("");
   const [dashboardItems, setDashboardItems] = useState([]);
   const [acceptingId, setAcceptingId] = useState(null);
 
+
   // Contact details revealed after acceptance
   const [acceptedContacts, setAcceptedContacts] = useState({});
 
-  // Blood request form data
+
+  // ==================================================
+  // BLOOD REQUEST FORM DATA
+  // ==================================================
+
   const [requestData, setRequestData] = useState({
     patient_name: "",
     blood_group: "O+",
@@ -38,25 +82,40 @@ function App() {
     units_required: 1,
   });
 
+
   // Matching results
   const [matches, setMatches] = useState([]);
+
 
   // Request states
   const [requestLoading, setRequestLoading] = useState(false);
   const [requestError, setRequestError] = useState("");
   const [requestSubmitted, setRequestSubmitted] = useState(false);
 
-  // Donor registration form
+
+  // ==================================================
+  // DONOR REGISTRATION DATA
+  // ==================================================
+
+  /*
+    Name and email are NOT collected here anymore.
+
+    The backend automatically uses:
+      current_user.full_name
+      current_user.email
+
+    from the authenticated account.
+  */
+
   const [donorData, setDonorData] = useState({
-    name: "",
     blood_group: "O+",
     city: "Kochi",
     latitude: "9.9312",
     longitude: "76.2673",
     last_donation_date: "",
     phone: "",
-    email: "",
   });
+
 
   // Donor registration states
   const [donorLoading, setDonorLoading] = useState(false);
@@ -65,15 +124,314 @@ function App() {
 
 
   // ==================================================
+  // RESTORE LOGIN SESSION
+  // ==================================================
+
+  useEffect(() => {
+    const savedRefreshToken = localStorage.getItem(
+      "bloodbridge_refresh_token"
+    );
+
+    if (!savedRefreshToken) {
+      return;
+    }
+
+    const restoreSession = async () => {
+      try {
+        const data = await refreshAccessToken(
+          savedRefreshToken
+        );
+
+        if (data?.refresh_token) {
+          localStorage.setItem(
+            "bloodbridge_refresh_token",
+            data.refresh_token
+          );
+        }
+
+        if (data?.user) {
+          setCurrentUser(data.user);
+        }
+
+      } catch (error) {
+        console.error(
+          "Session restore failed:",
+          error
+        );
+
+        localStorage.removeItem(
+          "bloodbridge_refresh_token"
+        );
+      }
+    };
+
+    restoreSession();
+  }, []);
+
+
+  // ==================================================
+  // OPEN AUTH MODAL
+  // ==================================================
+
+  const openAuthForm = (mode = "login", action = null) => {
+    setAuthMode(mode);
+    setShowAuthForm(true);
+
+    setAuthError("");
+    setAuthSuccess("");
+
+    setPendingAction(action);
+
+    setMenuOpen(false);
+  };
+
+
+  // ==================================================
+  // CLOSE AUTH MODAL
+  // ==================================================
+
+  const closeAuthForm = () => {
+    setShowAuthForm(false);
+
+    setAuthError("");
+    setAuthSuccess("");
+
+    setPendingAction(null);
+  };
+
+
+  // ==================================================
+  // UPDATE AUTH DATA
+  // ==================================================
+
+  const updateAuthData = (field, value) => {
+    setAuthData((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+  };
+
+
+  // ==================================================
+  // SWITCH AUTH MODE
+  // ==================================================
+
+  const switchAuthMode = (mode) => {
+    setAuthMode(mode);
+
+    setAuthError("");
+    setAuthSuccess("");
+
+    setAuthData((previous) => ({
+      ...previous,
+      full_name: "",
+      email: "",
+      password: "",
+    }));
+  };
+
+
+  // ==================================================
+  // LOGIN
+  // ==================================================
+
+  const handleLogin = async (event) => {
+    event.preventDefault();
+
+    setAuthLoading(true);
+    setAuthError("");
+    setAuthSuccess("");
+
+    try {
+      const data = await loginUser({
+        email: authData.email.trim(),
+        password: authData.password,
+      });
+
+      if (data?.refresh_token) {
+        localStorage.setItem(
+          "bloodbridge_refresh_token",
+          data.refresh_token
+        );
+      }
+
+      if (data?.user) {
+        setCurrentUser(data.user);
+      }
+
+      setAuthSuccess(
+        "Login successful. Welcome back to BloodBridge."
+      );
+
+      const actionAfterLogin = pendingAction;
+
+      setAuthData({
+        full_name: "",
+        email: "",
+        password: "",
+        role: "donor",
+      });
+
+      setTimeout(() => {
+        setShowAuthForm(false);
+        setAuthSuccess("");
+
+        setPendingAction(null);
+
+        if (actionAfterLogin === "donor") {
+          setShowDonorForm(true);
+        }
+
+        if (actionAfterLogin === "request") {
+          setShowRequestForm(true);
+        }
+
+        if (actionAfterLogin === "dashboard") {
+          setShowDashboard(true);
+          loadDashboard();
+        }
+      }, 500);
+
+    } catch (error) {
+      console.error(
+        "Login error:",
+        error
+      );
+
+      setAuthError(
+        error.message ||
+          "Unable to login. Please check your email and password."
+      );
+
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+
+  // ==================================================
+  // REGISTER ACCOUNT
+  // ==================================================
+
+  const handleRegister = async (event) => {
+    event.preventDefault();
+
+    setAuthLoading(true);
+    setAuthError("");
+    setAuthSuccess("");
+
+    try {
+      const data = await registerUser({
+        full_name: authData.full_name.trim(),
+        email: authData.email.trim(),
+        password: authData.password,
+        role: authData.role,
+      });
+
+      console.log(
+        "Account registered:",
+        data
+      );
+
+      setAuthSuccess(
+        "Account created successfully. Please login to continue."
+      );
+
+      setAuthData({
+        full_name: "",
+        email: authData.email.trim(),
+        password: "",
+        role: authData.role,
+      });
+
+      setTimeout(() => {
+        setAuthMode("login");
+        setAuthSuccess("");
+      }, 900);
+
+    } catch (error) {
+      console.error(
+        "Registration error:",
+        error
+      );
+
+      setAuthError(
+        error.message ||
+          "Unable to create your account. Please try again."
+      );
+
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+
+  // ==================================================
+  // LOGOUT
+  // ==================================================
+
+  const handleLogout = async () => {
+    const refreshToken = localStorage.getItem(
+      "bloodbridge_refresh_token"
+    );
+
+    try {
+      if (refreshToken) {
+        await logoutUser(refreshToken);
+      }
+    } catch (error) {
+      console.error(
+        "Logout error:",
+        error
+      );
+    } finally {
+      localStorage.removeItem(
+        "bloodbridge_refresh_token"
+      );
+
+      setCurrentUser(null);
+
+      setShowDashboard(false);
+      setShowDonorForm(false);
+      setShowRequestForm(false);
+
+      setDashboardItems([]);
+      setAcceptedContacts({});
+    }
+  };
+
+
+  // ==================================================
+  // REQUIRE LOGIN
+  // ==================================================
+
+  const requireLogin = (action) => {
+    if (!currentUser) {
+      openAuthForm("login", action);
+      return false;
+    }
+
+    return true;
+  };
+
+
+  // ==================================================
   // OPEN FIND DONOR FORM
   // ==================================================
 
   const openRequestForm = () => {
+    if (!requireLogin("request")) {
+      return;
+    }
+
     setShowRequestForm(true);
     setShowDonorForm(false);
+
     setMatches([]);
     setRequestError("");
     setRequestSubmitted(false);
+
+    setMenuOpen(false);
   };
 
 
@@ -83,6 +441,7 @@ function App() {
 
   const closeRequestForm = () => {
     setShowRequestForm(false);
+
     setMatches([]);
     setRequestError("");
     setRequestSubmitted(false);
@@ -94,10 +453,17 @@ function App() {
   // ==================================================
 
   const openDonorForm = () => {
+    if (!requireLogin("donor")) {
+      return;
+    }
+
     setShowDonorForm(true);
     setShowRequestForm(false);
+
     setDonorError("");
     setDonorSuccess("");
+
+    setMenuOpen(false);
   };
 
 
@@ -107,6 +473,7 @@ function App() {
 
   const closeDonorForm = () => {
     setShowDonorForm(false);
+
     setDonorError("");
     setDonorSuccess("");
   };
@@ -143,6 +510,11 @@ function App() {
   const findDonors = async (event) => {
     event.preventDefault();
 
+    if (!currentUser) {
+      openAuthForm("login", "request");
+      return;
+    }
+
     setRequestLoading(true);
     setRequestError("");
     setMatches([]);
@@ -150,25 +522,45 @@ function App() {
 
     try {
       const data = await createBloodRequest({
-        patient_name: requestData.patient_name.trim(),
-        blood_group: requestData.blood_group,
-        city: requestData.city.trim(),
-        latitude: Number(requestData.latitude),
-        longitude: Number(requestData.longitude),
-        units_required: Number(requestData.units_required),
+        patient_name:
+          requestData.patient_name.trim(),
+
+        blood_group:
+          requestData.blood_group,
+
+        city:
+          requestData.city.trim(),
+
+        latitude:
+          Number(requestData.latitude),
+
+        longitude:
+          Number(requestData.longitude),
+
+        units_required:
+          Number(requestData.units_required),
       });
 
-      console.log("Blood request created:", data);
+      console.log(
+        "Blood request created:",
+        data
+      );
 
-      setMatches(data?.matching_donors || []);
+      setMatches(
+        data?.matching_donors || []
+      );
+
       setRequestSubmitted(true);
 
     } catch (error) {
-      console.error("Blood request error:", error);
+      console.error(
+        "Blood request error:",
+        error
+      );
 
       setRequestError(
         error.message ||
-          "Unable to connect to BloodBridge. Please make sure the backend is running."
+          "Unable to connect to BloodBridge. Please try again."
       );
 
     } finally {
@@ -178,11 +570,16 @@ function App() {
 
 
   // ==================================================
-  // REGISTER DONOR
+  // REGISTER DONOR PROFILE
   // ==================================================
 
   const registerDonor = async (event) => {
     event.preventDefault();
+
+    if (!currentUser) {
+      openAuthForm("login", "donor");
+      return;
+    }
 
     setDonorLoading(true);
     setDonorError("");
@@ -190,54 +587,44 @@ function App() {
 
     try {
       const data = await createDonor({
-        name: donorData.name.trim(),
-        blood_group: donorData.blood_group,
-        city: donorData.city.trim(),
-        latitude: Number(donorData.latitude),
-        longitude: Number(donorData.longitude),
+        blood_group:
+          donorData.blood_group,
+
+        city:
+          donorData.city.trim(),
+
+        latitude:
+          Number(donorData.latitude),
+
+        longitude:
+          Number(donorData.longitude),
+
         last_donation_date:
           donorData.last_donation_date || null,
-        phone: donorData.phone.trim(),
-        email: donorData.email.trim(),
+
+        phone:
+          donorData.phone.trim(),
       });
 
-      console.log("Donor registered:", data);
-
-
-      // ------------------------------------------
-      // SAVE DONOR ID
-      // ------------------------------------------
-      //
-      // The donor dashboard is now donor-specific.
-      // We save the newly registered donor ID so
-      // the dashboard knows which donor is logged in.
-      //
-
-      if (data?.donor?.id) {
-        localStorage.setItem(
-          "bloodbridge_donor_id",
-          String(data.donor.id)
-        );
-      }
-
+      console.log(
+        "Donor profile registered:",
+        data
+      );
 
       setDonorSuccess(
-        "Donor registered successfully. Thank you for helping save lives."
+        "Donor profile registered successfully. Thank you for helping save lives."
       );
 
       setDonorData({
-        name: "",
         blood_group: "O+",
         city: "Kochi",
         latitude: "9.9312",
         longitude: "76.2673",
         last_donation_date: "",
         phone: "",
-        email: "",
       });
 
-
-      // Refresh dashboard if it is currently open
+      // Refresh dashboard if open
       if (showDashboard) {
         await loadDashboard();
       }
@@ -250,7 +637,7 @@ function App() {
 
       setDonorError(
         error.message ||
-          "Unable to connect to BloodBridge. Please make sure the backend is running."
+          "Unable to register donor profile. Please try again."
       );
 
     } finally {
@@ -264,101 +651,68 @@ function App() {
   // ==================================================
 
   const loadDashboard = async () => {
+    if (!currentUser) {
+      return;
+    }
+
     setDashboardLoading(true);
     setDashboardError("");
 
     try {
+      const data = await getMyDashboard();
 
-      // ------------------------------------------
-      // GET CURRENT DONOR ID
-      // ------------------------------------------
-
-      const donorId = localStorage.getItem(
-        "bloodbridge_donor_id"
-      );
-
-
-      // ------------------------------------------
-      // NO DONOR REGISTERED
-      // ------------------------------------------
-
-      if (!donorId) {
-
-        setDashboardItems([]);
-
-        setDashboardError(
-          "Please register as a donor first to access your donor dashboard."
-        );
-
-        return;
-      }
-
-
-      // ------------------------------------------
-      // LOAD DONOR-SPECIFIC DASHBOARD
-      // ------------------------------------------
-
-      const data = await getDashboard(donorId);
-
-      const items = data?.dashboard || [];
+      const items =
+        data?.dashboard || [];
 
 
       // ------------------------------------------
       // SORT DASHBOARD
       // ------------------------------------------
-      //
-      // Pending requests first.
-      // Then accepted/closed requests.
-      // Within the same status, newest first.
-      //
 
-      const sortedItems = [...items].sort(
-        (a, b) => {
+      const sortedItems =
+        [...items].sort(
+          (a, b) => {
 
-          if (
-            a.status === "pending" &&
-            b.status !== "pending"
-          ) {
-            return -1;
+            if (
+              a.status === "pending" &&
+              b.status !== "pending"
+            ) {
+              return -1;
+            }
+
+            if (
+              a.status !== "pending" &&
+              b.status === "pending"
+            ) {
+              return 1;
+            }
+
+            return b.id - a.id;
           }
-
-          if (
-            a.status !== "pending" &&
-            b.status === "pending"
-          ) {
-            return 1;
-          }
-
-          return b.id - a.id;
-        }
-      );
+        );
 
 
       // ------------------------------------------
       // RESTORE CONTACT DETAILS FROM STATE
       // ------------------------------------------
-      //
-      // Contact information is only available in
-      // acceptedContacts after the donor accepts.
-      //
-      // The dashboard API itself does NOT expose
-      // phone/email.
-      //
 
-      const finalItems = sortedItems.map(
-        (item) => ({
-          ...item,
+      const finalItems =
+        sortedItems.map(
+          (item) => ({
+            ...item,
 
-          donorContact:
-            acceptedContacts[item.id] || null,
-        })
+            donorContact:
+              acceptedContacts[item.id] ||
+              null,
+          })
+        );
+
+
+      setDashboardItems(
+        finalItems
       );
 
-
-      setDashboardItems(finalItems);
-
     } catch (error) {
-
       console.error(
         "Dashboard error:",
         error
@@ -366,7 +720,7 @@ function App() {
 
       setDashboardError(
         error.message ||
-          "Unable to load donor dashboard. Please make sure the backend is running."
+          "Unable to load donor dashboard. Please try again."
       );
 
     } finally {
@@ -380,6 +734,10 @@ function App() {
   // ==================================================
 
   const openDashboard = async () => {
+    if (!requireLogin("dashboard")) {
+      return;
+    }
+
     setShowDashboard(true);
     setMenuOpen(false);
 
@@ -405,15 +763,13 @@ function App() {
     notificationId
   ) => {
 
-    setAcceptingId(notificationId);
+    setAcceptingId(
+      notificationId
+    );
+
     setDashboardError("");
 
     try {
-
-      // ------------------------------------------
-      // ACCEPT REQUEST
-      // ------------------------------------------
-
       const data =
         await acceptNotification(
           notificationId
@@ -430,58 +786,58 @@ function App() {
       // ------------------------------------------
 
       if (data?.donor_contact) {
-
         setAcceptedContacts(
           (previous) => ({
             ...previous,
+
             [notificationId]:
               data.donor_contact,
           })
         );
-
       }
 
 
       // ------------------------------------------
-      // UPDATE CURRENT DASHBOARD ITEM
+      // UPDATE DASHBOARD ITEM
       // ------------------------------------------
 
       setDashboardItems(
         (previousItems) =>
-          previousItems.map((item) => {
+          previousItems.map(
+            (item) => {
 
-            if (
-              item.id !== notificationId
-            ) {
-              return item;
+              if (
+                item.id !==
+                notificationId
+              ) {
+                return item;
+              }
+
+              return {
+                ...item,
+
+                status: "accepted",
+
+                request: {
+                  ...item.request,
+                  status: "matched",
+                },
+
+                donor: {
+                  ...item.donor,
+                  status: "reserved",
+                },
+
+                donorContact:
+                  data?.donor_contact ||
+                  item.donorContact ||
+                  null,
+              };
             }
-
-            return {
-              ...item,
-
-              status: "accepted",
-
-              request: {
-                ...item.request,
-                status: "matched",
-              },
-
-              donor: {
-                ...item.donor,
-                status: "reserved",
-              },
-
-              donorContact:
-                data?.donor_contact ||
-                item.donorContact ||
-                null,
-            };
-
-          })
+          )
       );
 
     } catch (error) {
-
       console.error(
         "Accept request error:",
         error
@@ -546,6 +902,7 @@ function App() {
             Home
           </a>
 
+
           <a
             href="#inventory"
             onClick={handleNavClick}
@@ -553,12 +910,14 @@ function App() {
             Blood Inventory
           </a>
 
+
           <a
             href="#eligibility"
             onClick={handleNavClick}
           >
             Eligibility
           </a>
+
 
           <a
             href="#drives"
@@ -578,14 +937,44 @@ function App() {
           </button>
 
 
+          {/* USER ACCOUNT */}
+
+          {currentUser ? (
+
+            <div className="user-menu">
+
+              <span className="user-greeting">
+                Hi, {currentUser.full_name}
+              </span>
+
+              <button
+                className="dashboard-nav-button"
+                onClick={handleLogout}
+              >
+                Logout
+              </button>
+
+            </div>
+
+          ) : (
+
+            <button
+              className="dashboard-nav-button"
+              onClick={() =>
+                openAuthForm("login")
+              }
+            >
+              Login
+            </button>
+
+          )}
+
+
           {/* DONATE */}
 
           <button
             className="nav-button"
-            onClick={() => {
-              openDonorForm();
-              setMenuOpen(false);
-            }}
+            onClick={openDonorForm}
           >
             Donate Now
           </button>
@@ -623,11 +1012,13 @@ function App() {
             ● LIVE BLOOD AVAILABILITY
           </div>
 
+
           <h1>
             One donation.
             <br />
             <span>Multiple lives.</span>
           </h1>
+
 
           <p>
             BloodBridge connects people who need blood
@@ -644,6 +1035,7 @@ function App() {
             >
               Find a Donor →
             </button>
+
 
             <button
               className="secondary-button"
@@ -662,6 +1054,7 @@ function App() {
               <span>👤</span>
               <span>👤</span>
             </div>
+
 
             <div>
 
@@ -1209,6 +1602,261 @@ function App() {
 
 
       {/* ==================================================
+          AUTHENTICATION MODAL
+      ================================================== */}
+
+      {showAuthForm && (
+
+        <section className="request-overlay">
+
+          <div className="request-modal auth-modal">
+
+            <button
+              className="close-button"
+              onClick={closeAuthForm}
+              aria-label="Close authentication"
+            >
+              ×
+            </button>
+
+
+            <span className="eyebrow">
+              BLOODBRIDGE ACCOUNT
+            </span>
+
+
+            <h2>
+              {authMode === "login"
+                ? "Welcome back"
+                : "Create your account"}
+            </h2>
+
+
+            <p className="modal-description">
+
+              {authMode === "login"
+                ? "Login to access your BloodBridge account and continue."
+                : "Create a secure account to request blood or register as a donor."}
+
+            </p>
+
+
+            {/* AUTH ERROR */}
+
+            {authError && (
+
+              <div className="error-message">
+                {authError}
+              </div>
+
+            )}
+
+
+            {/* AUTH SUCCESS */}
+
+            {authSuccess && (
+
+              <div className="form-success">
+                ✓ {authSuccess}
+              </div>
+
+            )}
+
+
+            <form
+              onSubmit={
+                authMode === "login"
+                  ? handleLogin
+                  : handleRegister
+              }
+            >
+
+              {/* FULL NAME */}
+
+              {authMode === "register" && (
+
+                <>
+                  <label>
+                    Full name
+                  </label>
+
+                  <input
+                    type="text"
+                    placeholder="Enter your full name"
+                    value={
+                      authData.full_name
+                    }
+                    onChange={(event) =>
+                      updateAuthData(
+                        "full_name",
+                        event.target.value
+                      )
+                    }
+                    minLength="2"
+                    required
+                  />
+                </>
+
+              )}
+
+
+              {/* EMAIL */}
+
+              <label>
+                Email address
+              </label>
+
+              <input
+                type="email"
+                placeholder="Enter your email"
+                value={authData.email}
+                onChange={(event) =>
+                  updateAuthData(
+                    "email",
+                    event.target.value
+                  )
+                }
+                required
+              />
+
+
+              {/* PASSWORD */}
+
+              <label>
+                Password
+              </label>
+
+              <input
+                type="password"
+                placeholder="Enter your password"
+                value={authData.password}
+                onChange={(event) =>
+                  updateAuthData(
+                    "password",
+                    event.target.value
+                  )
+                }
+                minLength="8"
+                required
+              />
+
+
+              {/* ROLE */}
+
+              {authMode === "register" && (
+
+                <>
+                  <label>
+                    Account type
+                  </label>
+
+                  <select
+                    value={authData.role}
+                    onChange={(event) =>
+                      updateAuthData(
+                        "role",
+                        event.target.value
+                      )
+                    }
+                  >
+
+                    <option value="donor">
+                      Donor
+                    </option>
+
+                    <option value="requester">
+                      Blood Requester
+                    </option>
+
+                  </select>
+
+
+                  <div className="privacy-note">
+
+                    🔒 Your account information is protected.
+                    Donor contact details are only revealed
+                    after a donor accepts a blood request.
+
+                  </div>
+
+                </>
+
+              )}
+
+
+              {/* SUBMIT */}
+
+              <button
+                type="submit"
+                className="primary-button full"
+                disabled={authLoading}
+              >
+
+                {authLoading
+
+                  ? authMode === "login"
+                    ? "Logging in..."
+                    : "Creating account..."
+
+                  : authMode === "login"
+                    ? "Login →"
+                    : "Create Account →"}
+
+              </button>
+
+            </form>
+
+
+            {/* SWITCH LOGIN / REGISTER */}
+
+            <div className="auth-switch">
+
+              {authMode === "login" ? (
+
+                <p>
+                  Don't have a BloodBridge account?
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      switchAuthMode(
+                        "register"
+                      )
+                    }
+                  >
+                    Create an account
+                  </button>
+                </p>
+
+              ) : (
+
+                <p>
+                  Already have an account?
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      switchAuthMode(
+                        "login"
+                      )
+                    }
+                  >
+                    Login
+                  </button>
+                </p>
+
+              )}
+
+            </div>
+
+          </div>
+
+        </section>
+
+      )}
+
+
+      {/* ==================================================
           DONOR DASHBOARD MODAL
       ================================================== */}
 
@@ -1264,9 +1912,7 @@ function App() {
             </div>
 
 
-            {/* ==================================================
-                LOADING
-            ================================================== */}
+            {/* LOADING */}
 
             {dashboardLoading && (
 
@@ -1289,9 +1935,7 @@ function App() {
             )}
 
 
-            {/* ==================================================
-                ERROR
-            ================================================== */}
+            {/* ERROR */}
 
             {!dashboardLoading &&
               dashboardError && (
@@ -1312,9 +1956,7 @@ function App() {
               )}
 
 
-            {/* ==================================================
-                EMPTY STATE
-            ================================================== */}
+            {/* EMPTY */}
 
             {!dashboardLoading &&
               !dashboardError &&
@@ -1341,9 +1983,7 @@ function App() {
               )}
 
 
-            {/* ==================================================
-                REQUEST LIST
-            ================================================== */}
+            {/* REQUEST LIST */}
 
             {!dashboardLoading &&
               !dashboardError &&
@@ -1375,325 +2015,315 @@ function App() {
                   </div>
 
 
-                  {dashboardItems.map((item) => {
+                  {dashboardItems.map(
+                    (item) => {
 
-                    const request =
-                      item.request || {};
+                      const request =
+                        item.request || {};
 
-                    const donor =
-                      item.donor || {};
+                      const donor =
+                        item.donor || {};
 
-                    const isPending =
-                      item.status === "pending";
+                      const isPending =
+                        item.status ===
+                        "pending";
 
-                    const isAccepted =
-                      item.status === "accepted";
+                      const isAccepted =
+                        item.status ===
+                        "accepted";
 
-                    const isClosed =
-                      item.status === "closed";
-
-
-                    // ------------------------------------------
-                    // STATUS TEXT
-                    // ------------------------------------------
-
-                    let statusText = "Pending";
-
-                    if (isAccepted) {
-                      statusText = "Accepted";
-                    }
-
-                    if (isClosed) {
-                      statusText = "Closed";
-                    }
+                      const isClosed =
+                        item.status ===
+                        "closed";
 
 
-                    // ------------------------------------------
-                    // STATUS CLASS
-                    // ------------------------------------------
+                      let statusText =
+                        "Pending";
 
-                    const statusClass =
-                      isPending
-                        ? "request-status pending"
-                        : "request-status accepted-status";
+                      if (isAccepted) {
+                        statusText =
+                          "Accepted";
+                      }
+
+                      if (isClosed) {
+                        statusText =
+                          "Closed";
+                      }
 
 
-                    return (
+                      const statusClass =
+                        isPending
+                          ? "request-status pending"
+                          : "request-status accepted-status";
 
-                      <div
-                        className={`dashboard-request ${
-                          isAccepted
-                            ? "accepted"
-                            : ""
-                        }`}
-                        key={item.id}
-                      >
 
-                        {/* ==================================
-                            REQUEST HEADER
-                        ================================== */}
+                      return (
 
-                        <div className="dashboard-request-top">
+                        <div
+                          className={`dashboard-request ${
+                            isAccepted
+                              ? "accepted"
+                              : ""
+                          }`}
+                          key={item.id}
+                        >
 
-                          <div className="dashboard-blood-group">
+                          {/* REQUEST HEADER */}
 
-                            🩸
+                          <div className="dashboard-request-top">
 
-                            <strong>
-                              {request.blood_group}
-                            </strong>
+                            <div className="dashboard-blood-group">
+
+                              🩸
+
+                              <strong>
+                                {request.blood_group}
+                              </strong>
+
+                            </div>
+
+
+                            <span
+                              className={
+                                statusClass
+                              }
+                            >
+                              {statusText}
+                            </span>
 
                           </div>
 
 
-                          <span
-                            className={statusClass}
-                          >
-                            {statusText}
-                          </span>
+                          {/* PATIENT */}
 
-                        </div>
-
-
-                        {/* ==================================
-                            PATIENT
-                        ================================== */}
-
-                        <div className="dashboard-patient">
-
-                          <span>
-                            PATIENT
-                          </span>
-
-                          <strong>
-                            {request.patient_name}
-                          </strong>
-
-                        </div>
-
-
-                        {/* ==================================
-                            DETAILS
-                        ================================== */}
-
-                        <div className="dashboard-details">
-
-                          <div>
+                          <div className="dashboard-patient">
 
                             <span>
-                              📍 Location
+                              PATIENT
                             </span>
 
                             <strong>
-                              {request.city}
+                              {request.patient_name}
                             </strong>
 
                           </div>
 
 
-                          <div>
+                          {/* DETAILS */}
 
-                            <span>
-                              📏 Distance
-                            </span>
+                          <div className="dashboard-details">
 
-                            <strong>
-                              {item.distance_km ?? "—"} km
-                            </strong>
+                            <div>
+
+                              <span>
+                                📍 Location
+                              </span>
+
+                              <strong>
+                                {request.city}
+                              </strong>
+
+                            </div>
+
+
+                            <div>
+
+                              <span>
+                                📏 Distance
+                              </span>
+
+                              <strong>
+                                {item.distance_km ??
+                                  "—"} km
+                              </strong>
+
+                            </div>
+
+
+                            <div>
+
+                              <span>
+                                📦 Units required
+                              </span>
+
+                              <strong>
+                                {request.units_required}
+                              </strong>
+
+                            </div>
 
                           </div>
 
 
-                          <div>
+                          {/* MATCH REASON */}
 
-                            <span>
-                              📦 Units required
-                            </span>
+                          {!isClosed && (
 
-                            <strong>
-                              {request.units_required}
-                            </strong>
+                            <div className="privacy-note">
 
-                          </div>
+                              ✓{" "}
 
-                        </div>
+                              {item.match_reason ||
+                                "Matched based on blood group, availability, donation interval and location."}
 
+                            </div>
 
-                        {/* ==================================
-                            MATCH REASON
-                        ================================== */}
-
-                        {!isClosed && (
-
-                          <div className="privacy-note">
-
-                            ✓{" "}
-
-                            {item.match_reason ||
-                              "Matched based on blood group, availability, donation interval and location."}
-
-                          </div>
-
-                        )}
+                          )}
 
 
-                        {/* ==================================
-                            PENDING REQUEST
-                        ================================== */}
+                          {/* PENDING */}
 
-                        {isPending && (
+                          {isPending && (
 
-                          <>
+                            <>
+
+                              <div className="dashboard-privacy">
+
+                                <span>
+                                  🔒
+                                </span>
+
+                                <div>
+
+                                  <strong>
+                                    Your contact details
+                                    are private
+                                  </strong>
+
+                                  <p>
+                                    Your phone number and
+                                    email will only be
+                                    revealed after you accept
+                                    this request.
+                                  </p>
+
+                                </div>
+
+                              </div>
+
+
+                              <button
+                                className="primary-button dashboard-accept"
+                                onClick={() =>
+                                  acceptDonorRequest(
+                                    item.id
+                                  )
+                                }
+                                disabled={
+                                  acceptingId ===
+                                  item.id
+                                }
+                              >
+
+                                {acceptingId ===
+                                item.id
+                                  ? "Accepting..."
+                                  : "Accept Request →"}
+
+                              </button>
+
+                            </>
+
+                          )}
+
+
+                          {/* ACCEPTED */}
+
+                          {isAccepted && (
+
+                            <div className="contact-reveal">
+
+                              <div className="success-heading">
+
+                                <span>
+                                  ✓
+                                </span>
+
+                                <div>
+
+                                  <strong>
+                                    Request accepted
+                                  </strong>
+
+                                  <small>
+                                    Contact details are now
+                                    available.
+                                  </small>
+
+                                </div>
+
+                              </div>
+
+
+                              <div className="contact-grid">
+
+                                <div className="contact-item">
+
+                                  <span>
+                                    📞 Phone
+                                  </span>
+
+                                  <strong>
+                                    {item.donorContact?.phone ||
+                                      "Contact available"}
+                                  </strong>
+
+                                </div>
+
+
+                                <div className="contact-item">
+
+                                  <span>
+                                    ✉ Email
+                                  </span>
+
+                                  <strong>
+                                    {item.donorContact?.email ||
+                                      "Contact available"}
+                                  </strong>
+
+                                </div>
+
+                              </div>
+
+                            </div>
+
+                          )}
+
+
+                          {/* CLOSED */}
+
+                          {isClosed && (
 
                             <div className="dashboard-privacy">
 
                               <span>
-                                🔒
+                                ℹ
                               </span>
 
                               <div>
 
                                 <strong>
-                                  Your contact details
-                                  are private
+                                  Request closed
                                 </strong>
 
                                 <p>
-                                  Your phone number and
-                                  email will only be
-                                  revealed after you accept
-                                  this request.
+                                  Another eligible donor was
+                                  selected for this blood request.
                                 </p>
 
                               </div>
 
                             </div>
 
+                          )}
 
-                            <button
-                              className="primary-button dashboard-accept"
-                              onClick={() =>
-                                acceptDonorRequest(
-                                  item.id
-                                )
-                              }
-                              disabled={
-                                acceptingId ===
-                                item.id
-                              }
-                            >
+                        </div>
 
-                              {acceptingId === item.id
-                                ? "Accepting..."
-                                : "Accept Request →"}
+                      );
 
-                            </button>
-
-                          </>
-
-                        )}
-
-
-                        {/* ==================================
-                            ACCEPTED REQUEST
-                        ================================== */}
-
-                        {isAccepted && (
-
-                          <div className="contact-reveal">
-
-                            <div className="success-heading">
-
-                              <span>
-                                ✓
-                              </span>
-
-                              <div>
-
-                                <strong>
-                                  Request accepted
-                                </strong>
-
-                                <small>
-                                  Contact details are now
-                                  available.
-                                </small>
-
-                              </div>
-
-                            </div>
-
-
-                            <div className="contact-grid">
-
-                              <div className="contact-item">
-
-                                <span>
-                                  📞 Phone
-                                </span>
-
-                                <strong>
-                                  {item.donorContact?.phone ||
-                                    "Contact available"}
-                                </strong>
-
-                              </div>
-
-
-                              <div className="contact-item">
-
-                                <span>
-                                  ✉ Email
-                                </span>
-
-                                <strong>
-                                  {item.donorContact?.email ||
-                                    "Contact available"}
-                                </strong>
-
-                              </div>
-
-                            </div>
-
-                          </div>
-
-                        )}
-
-
-                        {/* ==================================
-                            CLOSED REQUEST
-                        ================================== */}
-
-                        {isClosed && (
-
-                          <div className="dashboard-privacy">
-
-                            <span>
-                              ℹ
-                            </span>
-
-                            <div>
-
-                              <strong>
-                                Request closed
-                              </strong>
-
-                              <p>
-                                Another eligible donor was
-                                selected for this blood request.
-                              </p>
-
-                            </div>
-
-                          </div>
-
-                        )}
-
-                      </div>
-
-                    );
-
-                  })}
+                    }
+                  )}
 
                 </div>
 
@@ -1729,9 +2359,11 @@ function App() {
               FIND A DONOR
             </span>
 
+
             <h2>
               Request blood
             </h2>
+
 
             <p className="modal-description">
               Enter the patient's details and BloodBridge
@@ -1741,7 +2373,7 @@ function App() {
 
             <form onSubmit={findDonors}>
 
-              {/* PATIENT NAME */}
+              {/* PATIENT */}
 
               <label>
                 Patient name
@@ -1750,7 +2382,9 @@ function App() {
               <input
                 type="text"
                 placeholder="Enter patient name"
-                value={requestData.patient_name}
+                value={
+                  requestData.patient_name
+                }
                 onChange={(event) =>
                   updateRequestData(
                     "patient_name",
@@ -1768,7 +2402,9 @@ function App() {
               </label>
 
               <select
-                value={requestData.blood_group}
+                value={
+                  requestData.blood_group
+                }
                 onChange={(event) =>
                   updateRequestData(
                     "blood_group",
@@ -1777,14 +2413,37 @@ function App() {
                 }
               >
 
-                <option value="O+">O+</option>
-                <option value="O-">O-</option>
-                <option value="A+">A+</option>
-                <option value="A-">A-</option>
-                <option value="B+">B+</option>
-                <option value="B-">B-</option>
-                <option value="AB+">AB+</option>
-                <option value="AB-">AB-</option>
+                <option value="O+">
+                  O+
+                </option>
+
+                <option value="O-">
+                  O-
+                </option>
+
+                <option value="A+">
+                  A+
+                </option>
+
+                <option value="A-">
+                  A-
+                </option>
+
+                <option value="B+">
+                  B+
+                </option>
+
+                <option value="B-">
+                  B-
+                </option>
+
+                <option value="AB+">
+                  AB+
+                </option>
+
+                <option value="AB-">
+                  AB-
+                </option>
 
               </select>
 
@@ -1797,7 +2456,9 @@ function App() {
 
               <input
                 type="text"
-                value={requestData.city}
+                value={
+                  requestData.city
+                }
                 onChange={(event) =>
                   updateRequestData(
                     "city",
@@ -1821,7 +2482,9 @@ function App() {
                   <input
                     type="number"
                     step="any"
-                    value={requestData.latitude}
+                    value={
+                      requestData.latitude
+                    }
                     onChange={(event) =>
                       updateRequestData(
                         "latitude",
@@ -1843,7 +2506,9 @@ function App() {
                   <input
                     type="number"
                     step="any"
-                    value={requestData.longitude}
+                    value={
+                      requestData.longitude
+                    }
                     onChange={(event) =>
                       updateRequestData(
                         "longitude",
@@ -1867,7 +2532,9 @@ function App() {
               <input
                 type="number"
                 min="1"
-                value={requestData.units_required}
+                value={
+                  requestData.units_required
+                }
                 onChange={(event) =>
                   updateRequestData(
                     "units_required",
@@ -1894,7 +2561,9 @@ function App() {
               <button
                 type="submit"
                 className="primary-button full"
-                disabled={requestLoading}
+                disabled={
+                  requestLoading
+                }
               >
 
                 {requestLoading
@@ -1906,9 +2575,7 @@ function App() {
             </form>
 
 
-            {/* ==================================================
-                MATCH RESULTS
-            ================================================== */}
+            {/* MATCH RESULTS */}
 
             {requestSubmitted && (
 
@@ -1931,54 +2598,56 @@ function App() {
                     </div>
 
 
-                    {matches.map((donor) => (
+                    {matches.map(
+                      (donor) => (
 
-                      <div
-                        className="match-card"
-                        key={donor.id}
-                      >
+                        <div
+                          className="match-card"
+                          key={donor.id}
+                        >
 
-                        <div className="match-avatar">
-                          🩸
-                        </div>
+                          <div className="match-avatar">
+                            🩸
+                          </div>
 
 
-                        <div className="match-info">
+                          <div className="match-info">
 
-                          <strong>
-                            {donor.name}
-                          </strong>
+                            <strong>
+                              {donor.name}
+                            </strong>
 
-                          <span>
-                            {donor.blood_group}
-                            {" · "}
-                            {donor.city}
-                          </span>
-
-                          <small>
-                            {donor.distance_km} km away
-                          </small>
-
-                          {/* MATCH REASON */}
-
-                          {donor.match_reason && (
+                            <span>
+                              {donor.blood_group}
+                              {" · "}
+                              {donor.city}
+                            </span>
 
                             <small>
-                              ✓ {donor.match_reason}
+                              {donor.distance_km} km away
                             </small>
 
-                          )}
+
+                            {donor.match_reason && (
+
+                              <small>
+                                ✓{" "}
+                                {donor.match_reason}
+                              </small>
+
+                            )}
+
+                          </div>
+
+
+                          <span className="available-badge">
+                            Available
+                          </span>
 
                         </div>
 
-
-                        <span className="available-badge">
-                          Available
-                        </span>
-
-                      </div>
-
-                    ))}
+                      )
+                    )}
 
 
                     <div className="privacy-note">
@@ -2041,37 +2710,37 @@ function App() {
               BECOME A DONOR
             </span>
 
+
             <h2>
               Register as a donor
             </h2>
 
+
             <p className="modal-description">
-              Join BloodBridge and help people in your
-              district find an eligible blood donor.
+
+              Welcome,{" "}
+              <strong>
+                {currentUser?.full_name}
+              </strong>
+              . Complete your donor profile to start
+              receiving nearby blood requests.
+
             </p>
 
 
+            {/* ACCOUNT INFORMATION */}
+
+            <div className="privacy-note">
+
+              ✓ Logged in as{" "}
+              <strong>
+                {currentUser?.email}
+              </strong>
+
+            </div>
+
+
             <form onSubmit={registerDonor}>
-
-              {/* NAME */}
-
-              <label>
-                Full name
-              </label>
-
-              <input
-                type="text"
-                placeholder="Enter your full name"
-                value={donorData.name}
-                onChange={(event) =>
-                  updateDonorData(
-                    "name",
-                    event.target.value
-                  )
-                }
-                required
-              />
-
 
               {/* BLOOD GROUP */}
 
@@ -2080,7 +2749,9 @@ function App() {
               </label>
 
               <select
-                value={donorData.blood_group}
+                value={
+                  donorData.blood_group
+                }
                 onChange={(event) =>
                   updateDonorData(
                     "blood_group",
@@ -2089,14 +2760,37 @@ function App() {
                 }
               >
 
-                <option value="O+">O+</option>
-                <option value="O-">O-</option>
-                <option value="A+">A+</option>
-                <option value="A-">A-</option>
-                <option value="B+">B+</option>
-                <option value="B-">B-</option>
-                <option value="AB+">AB+</option>
-                <option value="AB-">AB-</option>
+                <option value="O+">
+                  O+
+                </option>
+
+                <option value="O-">
+                  O-
+                </option>
+
+                <option value="A+">
+                  A+
+                </option>
+
+                <option value="A-">
+                  A-
+                </option>
+
+                <option value="B+">
+                  B+
+                </option>
+
+                <option value="B-">
+                  B-
+                </option>
+
+                <option value="AB+">
+                  AB+
+                </option>
+
+                <option value="AB-">
+                  AB-
+                </option>
 
               </select>
 
@@ -2110,7 +2804,9 @@ function App() {
               <input
                 type="text"
                 placeholder="Enter your city"
-                value={donorData.city}
+                value={
+                  donorData.city
+                }
                 onChange={(event) =>
                   updateDonorData(
                     "city",
@@ -2134,7 +2830,9 @@ function App() {
                   <input
                     type="number"
                     step="any"
-                    value={donorData.latitude}
+                    value={
+                      donorData.latitude
+                    }
                     onChange={(event) =>
                       updateDonorData(
                         "latitude",
@@ -2156,7 +2854,9 @@ function App() {
                   <input
                     type="number"
                     step="any"
-                    value={donorData.longitude}
+                    value={
+                      donorData.longitude
+                    }
                     onChange={(event) =>
                       updateDonorData(
                         "longitude",
@@ -2179,7 +2879,9 @@ function App() {
 
               <input
                 type="date"
-                value={donorData.last_donation_date}
+                value={
+                  donorData.last_donation_date
+                }
                 onChange={(event) =>
                   updateDonorData(
                     "last_donation_date",
@@ -2198,30 +2900,12 @@ function App() {
               <input
                 type="tel"
                 placeholder="Enter phone number"
-                value={donorData.phone}
+                value={
+                  donorData.phone
+                }
                 onChange={(event) =>
                   updateDonorData(
                     "phone",
-                    event.target.value
-                  )
-                }
-                required
-              />
-
-
-              {/* EMAIL */}
-
-              <label>
-                Email address
-              </label>
-
-              <input
-                type="email"
-                placeholder="Enter email address"
-                value={donorData.email}
-                onChange={(event) =>
-                  updateDonorData(
-                    "email",
                     event.target.value
                   )
                 }
@@ -2233,9 +2917,9 @@ function App() {
 
               <div className="privacy-note">
 
-                🔒 Your contact information will remain
-                private and will only be revealed after
-                accepting a matched blood request.
+                🔒 Your phone number will remain private
+                and will only be revealed after you accept
+                a matched blood request.
 
               </div>
 
@@ -2269,7 +2953,9 @@ function App() {
               <button
                 type="submit"
                 className="primary-button full"
-                disabled={donorLoading}
+                disabled={
+                  donorLoading
+                }
               >
 
                 {donorLoading
@@ -2319,6 +3005,7 @@ function BloodCard({
 
         </div>
 
+
         <span
           className={`urgency ${level.toLowerCase()}`}
         >
@@ -2357,7 +3044,6 @@ function BloodCard({
     </div>
 
   );
-
 }
 
 
@@ -2390,7 +3076,6 @@ function InfoCard({
     </div>
 
   );
-
 }
 
 
@@ -2442,7 +3127,6 @@ function DriveCard({
     </div>
 
   );
-
 }
 
 

@@ -6,9 +6,11 @@ from app.database.database import Base, engine
 # Import models so SQLAlchemy knows about all tables
 from app.models.donor import Donor
 from app.models.blood_request import BloodRequest
+from app.models.user import User
+from app.models.refresh_session import RefreshSession
 from app.models.notification import Notification
 
-from app.routers import donors, requests, notifications
+from app.routers import donors, requests, notifications, auth
 
 
 # Create database tables
@@ -42,6 +44,7 @@ app.add_middleware(
 app.include_router(donors.router)
 app.include_router(requests.router)
 app.include_router(notifications.router)
+app.include_router(auth.router)
 
 
 # ---------------------------------------------------------

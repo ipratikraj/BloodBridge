@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import hashlib
 from typing import Any
 
 import jwt
@@ -78,3 +79,8 @@ def decode_token(token: str) -> dict[str, Any]:
         settings.SECRET_KEY,
         algorithms=[ALGORITHM]
     )
+
+def hash_refresh_token(token: str) -> str:
+    return hashlib.sha256(
+        token.encode("utf-8")
+    ).hexdigest()
