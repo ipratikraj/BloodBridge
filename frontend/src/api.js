@@ -223,3 +223,19 @@ export async function getAcceptedContact(notificationId) {
     `/notifications/${notificationId}/contact`
   );
 }
+
+export async function getAdminRequests() {
+  return request("/admin/requests");
+}
+
+export async function verifyBloodRequest(requestId) {
+  return request(`/admin/requests/${requestId}/verify`, {
+    method: "PATCH",
+  });
+}
+
+export async function rejectBloodRequest(requestId) {
+  return request(`/admin/requests/${requestId}/reject`, {
+    method: "PATCH",
+  });
+}

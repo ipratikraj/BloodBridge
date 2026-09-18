@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import "./index.css";
 
@@ -10,6 +11,9 @@ import {
   registerUser,
   refreshAccessToken,
   logoutUser,
+  getAdminRequests,
+  verifyBloodRequest,
+  rejectBloodRequest,
 } from "./api";
 
 
@@ -67,6 +71,26 @@ function App() {
 
   // Contact details revealed after acceptance
   const [acceptedContacts, setAcceptedContacts] = useState({});
+
+
+  // ==================================================
+  // ADMIN DASHBOARD
+  // ==================================================
+
+  const [showAdminDashboard, setShowAdminDashboard] =
+    useState(false);
+
+  const [adminRequests, setAdminRequests] =
+    useState([]);
+
+  const [adminLoading, setAdminLoading] =
+    useState(false);
+
+  const [adminError, setAdminError] =
+    useState("");
+
+  const [adminActionId, setAdminActionId] =
+    useState(null);
 
 
   // ==================================================
@@ -292,6 +316,11 @@ function App() {
           setShowDashboard(true);
           loadDashboard();
         }
+
+        if (actionAfterLogin === "admin") {
+          setShowAdminDashboard(true);
+          loadAdminRequests();
+        }
       }, 500);
 
     } catch (error) {
@@ -394,10 +423,12 @@ function App() {
       setCurrentUser(null);
 
       setShowDashboard(false);
+      setShowAdminDashboard(false);
       setShowDonorForm(false);
       setShowRequestForm(false);
 
       setDashboardItems([]);
+      setAdminRequests([]);
       setAcceptedContacts({});
     }
   };
@@ -546,7 +577,7 @@ function App() {
           requestData.source_type,
 
         verification_status:
-          requestData.verification_status,
+          "pending",
       });
 
       console.log(
@@ -863,6 +894,139 @@ function App() {
 
 
   // ==================================================
+  // ADMIN DASHBOARD
+  // ==================================================
+
+  const loadAdminRequests = async () => {
+    setAdminLoading(true);
+    setAdminError("");
+
+    try {
+      const data = await getAdminRequests();
+
+      setAdminRequests(
+        Array.isArray(data)
+          ? data
+          : []
+      );
+
+    } catch (error) {
+      console.error(
+        "Admin requests error:",
+        error
+      );
+
+      setAdminError(
+        error.message ||
+          "Unable to load blood requests."
+      );
+
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+
+  // ==================================================
+  // OPEN ADMIN DASHBOARD
+  // ==================================================
+
+  const openAdminDashboard = async () => {
+    if (
+      !currentUser ||
+      currentUser.role !== "admin"
+    ) {
+      return;
+    }
+
+    setShowAdminDashboard(true);
+    setMenuOpen(false);
+
+    await loadAdminRequests();
+  };
+
+
+  // ==================================================
+  // CLOSE ADMIN DASHBOARD
+  // ==================================================
+
+  const closeAdminDashboard = () => {
+    setShowAdminDashboard(false);
+    setAdminError("");
+  };
+
+
+  // ==================================================
+  // VERIFY REQUEST
+  // ==================================================
+
+  const handleVerifyRequest = async (
+    requestId
+  ) => {
+
+    setAdminActionId(requestId);
+    setAdminError("");
+
+    try {
+      await verifyBloodRequest(
+        requestId
+      );
+
+      await loadAdminRequests();
+
+    } catch (error) {
+      console.error(
+        "Verify request error:",
+        error
+      );
+
+      setAdminError(
+        error.message ||
+          "Unable to verify this request."
+      );
+
+    } finally {
+      setAdminActionId(null);
+    }
+  };
+
+
+  // ==================================================
+  // REJECT REQUEST
+  // ==================================================
+
+  const handleRejectRequest = async (
+    requestId
+  ) => {
+
+    setAdminActionId(requestId);
+    setAdminError("");
+
+    try {
+      await rejectBloodRequest(
+        requestId
+      );
+
+      await loadAdminRequests();
+
+    } catch (error) {
+      console.error(
+        "Reject request error:",
+        error
+      );
+
+      setAdminError(
+        error.message ||
+          "Unable to reject this request."
+      );
+
+    } finally {
+      setAdminActionId(null);
+    }
+  };
+
+
+  // ==================================================
   // NAVIGATION
   // ==================================================
 
@@ -943,6 +1107,18 @@ function App() {
           >
             Donor Dashboard
           </button>
+
+
+          {/* ADMIN DASHBOARD */}
+
+          {currentUser?.role === "admin" && (
+            <button
+              className="dashboard-nav-button"
+              onClick={openAdminDashboard}
+            >
+              Admin Dashboard
+            </button>
+          )}
 
 
           {/* USER ACCOUNT */}
@@ -2345,6 +2521,396 @@ function App() {
 
 
       {/* ==================================================
+          ADMIN DASHBOARD MODAL
+      ================================================== */}
+
+      {showAdminDashboard && (
+
+        <section className="dashboard-overlay">
+
+          <div className="dashboard-modal">
+
+            <div className="dashboard-header">
+
+              <div>
+
+                <span className="eyebrow">
+                  BLOODBRIDGE ADMIN
+                </span>
+
+                <h2>
+                  Admin Dashboard
+                </h2>
+
+                <p>
+                  Review and verify blood requests.
+                </p>
+
+              </div>
+
+
+              <div className="dashboard-header-actions">
+
+                <button
+                  className="dashboard-refresh-button"
+                  onClick={loadAdminRequests}
+                  disabled={adminLoading}
+                  type="button"
+                >
+                  {adminLoading
+                    ? "Refreshing..."
+                    : "↻ Refresh"}
+                </button>
+
+
+                <button
+                  className="close-button"
+                  onClick={closeAdminDashboard}
+                  aria-label="Close admin dashboard"
+                >
+                  ×
+                </button>
+
+              </div>
+
+            </div>
+
+
+            {/* ADMIN ERROR */}
+
+            {adminError && (
+
+              <div className="error-message">
+                {adminError}
+              </div>
+
+            )}
+
+
+            {/* ADMIN LOADING */}
+
+            {adminLoading && (
+
+              <div className="dashboard-loading">
+
+                <div className="loading-drop">
+                  🩸
+                </div>
+
+                <strong>
+                  Loading blood requests...
+                </strong>
+
+                <span>
+                  Checking the latest requests.
+                </span>
+
+              </div>
+
+            )}
+
+
+            {/* EMPTY */}
+
+            {!adminLoading &&
+              !adminError &&
+              adminRequests.length === 0 && (
+
+                <div className="dashboard-empty">
+
+                  <div className="empty-icon">
+                    ✓
+                  </div>
+
+                  <h3>
+                    No blood requests
+                  </h3>
+
+                  <p>
+                    There are currently no blood requests
+                    to review.
+                  </p>
+
+                </div>
+
+              )}
+
+
+            {/* REQUEST LIST */}
+
+            {!adminLoading &&
+              adminRequests.length > 0 && (
+
+                <div className="dashboard-list">
+
+                  {/* SUMMARY */}
+
+                  <div className="dashboard-summary">
+
+                    <div>
+
+                      <strong>
+                        {adminRequests.length}
+                      </strong>
+
+                      <span>
+                        Blood request
+                        {adminRequests.length !== 1
+                          ? "s"
+                          : ""}
+                      </span>
+
+                    </div>
+
+                    <span className="dashboard-live">
+                      ● ADMIN
+                    </span>
+
+                  </div>
+
+
+                  {/* REQUESTS */}
+
+                  {adminRequests.map(
+                    (request) => {
+
+                      const isPending =
+                        request.verification_status ===
+                        "pending";
+
+                      const isVerified =
+                        request.verification_status ===
+                        "verified";
+
+                      const isRejected =
+                        request.verification_status ===
+                        "rejected";
+
+
+                      let sourceLabel =
+                        request.source_type;
+
+                      if (
+                        request.source_type ===
+                        "blood_bank"
+                      ) {
+                        sourceLabel =
+                          "Blood Bank";
+                      } else if (
+                        request.source_type
+                      ) {
+                        sourceLabel =
+                          request.source_type
+                            .charAt(0)
+                            .toUpperCase() +
+                          request.source_type.slice(1);
+                      }
+
+
+                      return (
+
+                        <div
+                          className="dashboard-request"
+                          key={request.id}
+                        >
+
+                          {/* REQUEST HEADER */}
+
+                          <div className="dashboard-request-top">
+
+                            <div className="dashboard-blood-group">
+
+                              🩸
+
+                              <strong>
+                                {request.blood_group}
+                              </strong>
+
+                            </div>
+
+
+                            <span
+                              className={
+                                isPending
+                                  ? "request-status pending"
+                                  : "request-status accepted-status"
+                              }
+                            >
+
+                              {isPending
+                                ? "Pending"
+                                : isVerified
+                                  ? "Verified"
+                                  : "Rejected"}
+
+                            </span>
+
+                          </div>
+
+
+                          {/* PATIENT */}
+
+                          <div className="dashboard-patient">
+
+                            <span>
+                              PATIENT
+                            </span>
+
+                            <strong>
+                              {request.patient_name}
+                            </strong>
+
+                          </div>
+
+
+                          {/* DETAILS */}
+
+                          <div className="dashboard-details">
+
+                            <div>
+
+                              <span>
+                                📍 Location
+                              </span>
+
+                              <strong>
+                                {request.city}
+                              </strong>
+
+                            </div>
+
+
+                            <div>
+
+                              <span>
+                                📦 Units required
+                              </span>
+
+                              <strong>
+                                {request.units_required}
+                              </strong>
+
+                            </div>
+
+
+                            <div>
+
+                              <span>
+                                🏥 Source
+                              </span>
+
+                              <strong>
+                                {sourceLabel}
+                              </strong>
+
+                            </div>
+
+                          </div>
+
+
+                          {/* ACTION BUTTONS */}
+
+                          {isPending && (
+
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: "10px",
+                                marginTop: "18px",
+                              }}
+                            >
+
+                              <button
+                                className="primary-button"
+                                type="button"
+                                disabled={
+                                  adminActionId ===
+                                  request.id
+                                }
+                                onClick={() =>
+                                  handleVerifyRequest(
+                                    request.id
+                                  )
+                                }
+                              >
+
+                                {adminActionId ===
+                                request.id
+                                  ? "Updating..."
+                                  : "✓ Verify"}
+
+                              </button>
+
+
+                              <button
+                                className="secondary-button"
+                                type="button"
+                                disabled={
+                                  adminActionId ===
+                                  request.id
+                                }
+                                onClick={() =>
+                                  handleRejectRequest(
+                                    request.id
+                                  )
+                                }
+                              >
+
+                                ✕ Reject
+
+                              </button>
+
+                            </div>
+
+                          )}
+
+
+                          {/* VERIFIED */}
+
+                          {isVerified && (
+
+                            <div className="privacy-note">
+
+                              ✓ This request has been verified
+                              by a BloodBridge administrator.
+
+                            </div>
+
+                          )}
+
+
+                          {/* REJECTED */}
+
+                          {isRejected && (
+
+                            <div className="privacy-note">
+
+                              This request was rejected by a
+                              BloodBridge administrator.
+
+                            </div>
+
+                          )}
+
+                        </div>
+
+                      );
+
+                    }
+                  )}
+
+                </div>
+
+              )}
+
+          </div>
+
+        </section>
+
+      )}
+
+
+      {/* ==================================================
           BLOOD REQUEST MODAL
       ================================================== */}
 
@@ -2584,38 +3150,14 @@ function App() {
               </select>
 
 
-              {/* VERIFICATION STATUS */}
-
-              <label>
-                Verification status
-              </label>
-
-              <select
-                value={requestData.verification_status}
-                onChange={(event) =>
-                  updateRequestData(
-                    "verification_status",
-                    event.target.value
-                  )
-                }
-              >
-
-                <option value="pending">
-                  Pending
-                </option>
-
-                <option value="verified">
-                  Verified
-                </option>
-
-              </select>
-
+              {/* VERIFICATION INFORMATION */}
 
               <div className="privacy-note">
-                ℹ Verification status records whether the
-                request has been marked as verified. BloodBridge
-                does not independently verify medical requests
-                in this prototype.
+
+                ℹ Your request will be submitted as
+                <strong> Pending </strong>
+                and reviewed by a BloodBridge administrator.
+
               </div>
 
 
@@ -2641,7 +3183,7 @@ function App() {
               >
 
                 {requestLoading
-                  ? "Finding donors..."
+                  ? "Submitting request..."
                   : "Find Matching Donors →"}
 
               </button>
@@ -3205,3 +3747,4 @@ function DriveCard({
 
 
 export default App;
+

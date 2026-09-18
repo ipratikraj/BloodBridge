@@ -10,8 +10,7 @@ from app.models.user import User
 from app.models.refresh_session import RefreshSession
 from app.models.notification import Notification
 
-from app.routers import donors, requests, notifications, auth
-
+from app.routers import donors, requests, notifications, auth, admin
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -29,8 +28,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://blood-bridge-1phv74cx9-pr-dd6d.vercel.app",
-        "https://blood-bridge-pink.vercel.app",
+       "http://localhost:5173",
+       "http://127.0.0.1:5173",
+       "https://blood-bridge-1phv74cx9-pr-dd6d.vercel.app",
+       "https://blood-bridge-pink.vercel.app",
     ],
     allow_credentials=False,
     allow_methods=["*"],
@@ -45,6 +46,7 @@ app.include_router(donors.router)
 app.include_router(requests.router)
 app.include_router(notifications.router)
 app.include_router(auth.router)
+app.include_router(admin.router)
 
 
 # ---------------------------------------------------------
