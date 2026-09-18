@@ -27,13 +27,13 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://blood-bridge-1phv74cx9-pr-dd6d.vercel.app",
         "https://blood-bridge-pink.vercel.app",
     ],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 # ---------------------------------------------------------
 # Routers
