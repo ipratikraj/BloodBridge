@@ -80,6 +80,8 @@ function App() {
     latitude: 9.9312,
     longitude: 76.2673,
     units_required: 1,
+    source_type: "individual",
+    verification_status: "pending",
   });
 
 
@@ -539,6 +541,12 @@ function App() {
 
         units_required:
           Number(requestData.units_required),
+
+        source_type:
+          requestData.source_type,
+
+        verification_status:
+          requestData.verification_status,
       });
 
       console.log(
@@ -2543,6 +2551,72 @@ function App() {
                 }
                 required
               />
+
+
+              {/* REQUEST SOURCE */}
+
+              <label>
+                Request source
+              </label>
+
+              <select
+                value={requestData.source_type}
+                onChange={(event) =>
+                  updateRequestData(
+                    "source_type",
+                    event.target.value
+                  )
+                }
+              >
+
+                <option value="individual">
+                  Individual
+                </option>
+
+                <option value="hospital">
+                  Hospital
+                </option>
+
+                <option value="blood_bank">
+                  Blood Bank
+                </option>
+
+              </select>
+
+
+              {/* VERIFICATION STATUS */}
+
+              <label>
+                Verification status
+              </label>
+
+              <select
+                value={requestData.verification_status}
+                onChange={(event) =>
+                  updateRequestData(
+                    "verification_status",
+                    event.target.value
+                  )
+                }
+              >
+
+                <option value="pending">
+                  Pending
+                </option>
+
+                <option value="verified">
+                  Verified
+                </option>
+
+              </select>
+
+
+              <div className="privacy-note">
+                ℹ Verification status records whether the
+                request has been marked as verified. BloodBridge
+                does not independently verify medical requests
+                in this prototype.
+              </div>
 
 
               {/* ERROR */}

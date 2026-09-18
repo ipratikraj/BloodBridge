@@ -35,6 +35,11 @@ def create_request(
         latitude=request.latitude,
         longitude=request.longitude,
         units_required=request.units_required,
+
+        # New request source and verification fields
+        source_type=request.source_type,
+        verification_status=request.verification_status,
+
         status="pending"
     )
 
@@ -63,7 +68,6 @@ def create_request(
         })
 
     # Find matching donors
-    
     all_matches = find_matching_donors(
         request.blood_group,
         request.latitude,
@@ -73,25 +77,21 @@ def create_request(
 
     # Select only the number of nearest donors
     # required for the requested units.
-    
     matches = all_matches[:request.units_required]
 
     # Create notifications for matched donors
     for donor in matches:
-
         notification = Notification(
             request_id=new_request.id,
             donor_id=donor["id"],
             status="pending"
         )
-
         db.add(notification)
 
     db.commit()
 
     return {
         "message": "Blood request created successfully",
-
         "request": {
             "id": new_request.id,
             "patient_name": new_request.patient_name,
@@ -100,9 +100,13 @@ def create_request(
             "latitude": new_request.latitude,
             "longitude": new_request.longitude,
             "units_required": new_request.units_required,
+
+            # New fields
+            "source_type": new_request.source_type,
+            "verification_status": new_request.verification_status,
+
             "status": new_request.status
         },
-
         "matching_donors": matches
     }
 
@@ -115,14 +119,10 @@ def create_request(
 def get_requests(
     db: Session = Depends(get_db)
 ):
-
-    blood_requests = db.query(
-        BloodRequest
-    ).all()
+    blood_requests = db.query(BloodRequest).all()
 
     return {
         "count": len(blood_requests),
-
         "requests": [
             {
                 "id": request.id,
@@ -132,9 +132,13 @@ def get_requests(
                 "latitude": request.latitude,
                 "longitude": request.longitude,
                 "units_required": request.units_required,
+
+                # New fields
+                "source_type": request.source_type,
+                "verification_status": request.verification_status,
+
                 "status": request.status
             }
-
             for request in blood_requests
         ]
     }
@@ -149,10 +153,7 @@ def get_request(
     request_id: int,
     db: Session = Depends(get_db)
 ):
-
-    blood_request = db.query(
-        BloodRequest
-    ).filter(
+    blood_request = db.query(BloodRequest).filter(
         BloodRequest.id == request_id
     ).first()
 
@@ -170,5 +171,10 @@ def get_request(
         "latitude": blood_request.latitude,
         "longitude": blood_request.longitude,
         "units_required": blood_request.units_required,
+
+        # New fields
+        "source_type": blood_request.source_type,
+        "verification_status": blood_request.verification_status,
+
         "status": blood_request.status
     }

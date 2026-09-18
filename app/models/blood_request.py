@@ -43,6 +43,18 @@ class BloodRequest(Base):
         nullable=False
     )
 
+    source_type = Column(
+        String,
+        nullable=False,
+        default="individual"
+    )
+
+    verification_status = Column(
+        String,
+        nullable=False,
+        default="pending"
+    )
+
     status = Column(
         String,
         default="pending"
