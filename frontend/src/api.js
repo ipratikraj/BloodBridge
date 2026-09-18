@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://bloodbridge-2.onrender.com";
+const API_BASE_URL = "https://bloodbridge-1-elsg.onrender.com";
 // ======================================================
 // COMMON API REQUEST FUNCTION
 // ======================================================
