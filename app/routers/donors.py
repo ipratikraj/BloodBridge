@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from datetime import date
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
@@ -10,19 +11,36 @@ router = APIRouter(
 )
 
 
+# ======================================================
 # Register a new donor
+# ======================================================
+
 @router.post("/")
 def create_donor(
     donor_data: dict,
     db: Session = Depends(get_db)
 ):
+    # Convert last donation date from string to Python date
+    last_donation_date = donor_data.get("last_donation_date")
+
+    if last_donation_date:
+        try:
+            last_donation_date = date.fromisoformat(
+                str(last_donation_date)
+            )
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid last donation date. Use YYYY-MM-DD format."
+            )
+
     donor = Donor(
         name=donor_data["name"],
         blood_group=donor_data["blood_group"],
         city=donor_data["city"],
         latitude=donor_data["latitude"],
         longitude=donor_data["longitude"],
-        last_donation_date=donor_data.get("last_donation_date"),
+        last_donation_date=last_donation_date,
         phone=donor_data["phone"],
         email=donor_data["email"],
         status="available"
@@ -44,8 +62,11 @@ def create_donor(
     }
 
 
+# ======================================================
 # Public donor list
 # Contact details are intentionally NOT returned
+# ======================================================
+
 @router.get("/")
 def get_donors(
     db: Session = Depends(get_db)
@@ -67,8 +88,11 @@ def get_donors(
     }
 
 
+# ======================================================
 # Public donor profile
 # Contact details are intentionally NOT returned
+# ======================================================
+
 @router.get("/{donor_id}")
 def get_donor(
     donor_id: int,
