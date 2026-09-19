@@ -238,3 +238,7 @@ export async function rejectBloodRequest(requestId) {
     method: "PATCH",
   });
 }
+
+export async function getAdminAnalytics() {
+  return request("/admin/analytics");
+}

@@ -12,13 +12,34 @@ import {
   refreshAccessToken,
   logoutUser,
   getAdminRequests,
+  getAdminAnalytics,
   verifyBloodRequest,
   rejectBloodRequest,
 } from "./api";
 
+import { SmartMatchCard } from "./components/SmartMatchBadge";
+import { DonationHistoryModal } from "./components/DonationHistoryModal";
+import { ImpactDashboardModal } from "./components/ImpactDashboardModal";
+import { BloodBankLocatorModal } from "./components/BloodBankLocatorModal";
+import { EligibilityCheckerModal } from "./components/EligibilityCheckerModal";
+import { NotificationCenterModal } from "./components/NotificationCenterModal";
+import { AdminAnalyticsView } from "./components/AdminAnalyticsModal";
+import { WhyDonateSection } from "./components/WhyDonateSection";
+
 
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // ==================================================
+  // NEW FEATURE MODAL & TAB STATES
+  // ==================================================
+  const [showEligibilityModal, setShowEligibilityModal] = useState(false);
+  const [showDonationHistoryModal, setShowDonationHistoryModal] = useState(false);
+  const [showImpactModal, setShowImpactModal] = useState(false);
+  const [showBloodBanksModal, setShowBloodBanksModal] = useState(false);
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [adminActiveTab, setAdminActiveTab] = useState("analytics");
+  const [adminAnalyticsData, setAdminAnalyticsData] = useState(null);
 
   // ==================================================
   // AUTHENTICATION
@@ -910,6 +931,15 @@ function App() {
           : []
       );
 
+      try {
+        const analytics = await getAdminAnalytics();
+        if (analytics) {
+          setAdminAnalyticsData(analytics);
+        }
+      } catch (err) {
+        console.warn("Analytics fetch fallback to presentation data:", err);
+      }
+
     } catch (error) {
       console.error(
         "Admin requests error:",
@@ -1084,11 +1114,35 @@ function App() {
 
 
           <a
-            href="#eligibility"
+            href="#why-donate"
             onClick={handleNavClick}
           >
-            Eligibility
+            Why Donate
           </a>
+
+
+          <button
+            type="button"
+            className="dashboard-nav-button"
+            onClick={() => {
+              setShowBloodBanksModal(true);
+              setMenuOpen(false);
+            }}
+          >
+            Find Blood Banks
+          </button>
+
+
+          <button
+            type="button"
+            className="dashboard-nav-button"
+            onClick={() => {
+              setShowEligibilityModal(true);
+              setMenuOpen(false);
+            }}
+          >
+            Eligibility Check
+          </button>
 
 
           <a
@@ -1097,6 +1151,21 @@ function App() {
           >
             Find a Drive
           </a>
+
+
+          {/* NOTIFICATIONS CENTER */}
+          <button
+            type="button"
+            className="notif-nav-btn"
+            onClick={() => {
+              setShowNotificationsModal(true);
+              setMenuOpen(false);
+            }}
+            aria-label="Notifications"
+            title="Activity Notifications"
+          >
+            🔔 <span className="notif-badge-pill">3</span>
+          </button>
 
 
           {/* DONOR DASHBOARD */}
@@ -1182,7 +1251,7 @@ function App() {
 
 
       {/* ==================================================
-          HERO
+          HERO (PREMIUM DESIGN)
       ================================================== */}
 
       <section
@@ -1193,21 +1262,20 @@ function App() {
         <div className="hero-content">
 
           <div className="badge">
-            ● LIVE BLOOD AVAILABILITY
+            ● 24/7 LIVE EMERGENCY NETWORK
           </div>
 
 
           <h1>
-            One donation.
+            Every second matters.
             <br />
-            <span>Multiple lives.</span>
+            <span>Find the right donor, faster.</span>
           </h1>
 
 
           <p>
-            BloodBridge connects people who need blood
-            with nearby eligible donors — quickly,
-            securely and responsibly.
+            BloodBridge instantly matches critical blood requests with compatible,
+            verified donors and accredited hospital blood centres in real-time.
           </p>
 
 
@@ -1217,7 +1285,7 @@ function App() {
               className="primary-button"
               onClick={openRequestForm}
             >
-              Find a Donor →
+              Find Blood →
             </button>
 
 
@@ -1228,30 +1296,23 @@ function App() {
               Become a Donor
             </button>
 
+
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setShowEligibilityModal(true)}
+            >
+              Check Eligibility
+            </button>
+
           </div>
 
 
-          <div className="hero-trust">
-
-            <div className="avatars">
-              <span>👤</span>
-              <span>👤</span>
-              <span>👤</span>
-            </div>
-
-
-            <div>
-
-              <strong>
-                2,400+ donors
-              </strong>
-
-              <small>
-                ready to help
-              </small>
-
-            </div>
-
+          {/* LIVE HERO STATS BADGES */}
+          <div className="hero-stats-pill-row">
+            <span className="hero-stat-pill">🩸 1,240+ Donors</span>
+            <span className="hero-stat-pill">❤️ 860+ Matches</span>
+            <span className="hero-stat-pill">🚨 320+ Requests</span>
           </div>
 
         </div>
@@ -1304,11 +1365,11 @@ function App() {
             <div>
 
               <strong>
-                Donor matched
+                Smart Match 94%
               </strong>
 
               <small>
-                0.8 km away
+                2.3 km away
               </small>
 
             </div>
@@ -1321,32 +1382,36 @@ function App() {
 
 
       {/* ==================================================
-          STATS
+          STATS (LIVE-LOOKING DEMO STATISTICS)
       ================================================== */}
 
       <section className="stats">
 
         <div>
-          <strong>2,400+</strong>
+          <strong>1,240+</strong>
           <span>Registered Donors</span>
         </div>
 
         <div>
-          <strong>1,850+</strong>
+          <strong>860+</strong>
           <span>Successful Matches</span>
         </div>
 
         <div>
-          <strong>18</strong>
-          <span>Districts Covered</span>
+          <strong>320+</strong>
+          <span>Requests Fulfilled</span>
         </div>
 
         <div>
           <strong>24/7</strong>
-          <span>Matching System</span>
+          <span>Emergency Network</span>
         </div>
 
       </section>
+
+      <div className="stats-demo-footnote">
+        *Live network statistics — simulated metrics for demonstration purposes.
+      </div>
 
 
       {/* ==================================================
@@ -1759,6 +1824,16 @@ function App() {
 
 
       {/* ==================================================
+          WHY DONATE BLOOD & SCIENTIFIC BENEFITS
+      ================================================== */}
+
+      <WhyDonateSection
+        onCheckEligibility={() => setShowEligibilityModal(true)}
+        onBecomeDonor={openDonorForm}
+      />
+
+
+      {/* ==================================================
           FOOTER
       ================================================== */}
 
@@ -2070,6 +2145,24 @@ function App() {
 
 
               <div className="dashboard-header-actions">
+
+                <button
+                  type="button"
+                  className="dashboard-refresh-button"
+                  style={{ background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0" }}
+                  onClick={() => setShowDonationHistoryModal(true)}
+                >
+                  📋 My Donations
+                </button>
+
+                <button
+                  type="button"
+                  className="dashboard-refresh-button"
+                  style={{ background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca" }}
+                  onClick={() => setShowImpactModal(true)}
+                >
+                  ❤️ Your Impact
+                </button>
 
                 <button
                   className="dashboard-refresh-button"
@@ -2576,15 +2669,45 @@ function App() {
             </div>
 
 
-            {/* ADMIN ERROR */}
+            {/* ADMIN TABS */}
+            <div className="admin-tabs-nav">
+              <button
+                type="button"
+                className={`admin-tab-btn ${adminActiveTab === "analytics" ? "active" : ""}`}
+                onClick={() => setAdminActiveTab("analytics")}
+              >
+                📊 Analytics Dashboard
+              </button>
 
-            {adminError && (
+              <button
+                type="button"
+                className={`admin-tab-btn ${adminActiveTab === "requests" ? "active" : ""}`}
+                onClick={() => setAdminActiveTab("requests")}
+              >
+                📋 Request Management ({adminRequests.length})
+              </button>
+            </div>
 
-              <div className="error-message">
-                {adminError}
-              </div>
 
+            {/* TAB 1: ANALYTICS OVERVIEW */}
+            {adminActiveTab === "analytics" && (
+              <AdminAnalyticsView
+                analyticsData={adminAnalyticsData}
+                onSwitchToRequests={() => setAdminActiveTab("requests")}
+              />
             )}
+
+
+            {/* TAB 2: REQUEST VERIFICATION */}
+            {adminActiveTab === "requests" && (
+              <div className="admin-requests-pane">
+
+                {/* ADMIN ERROR */}
+                {adminError && (
+                  <div className="error-message">
+                    {adminError}
+                  </div>
+                )}
 
 
             {/* ADMIN LOADING */}
@@ -2903,6 +3026,10 @@ function App() {
 
               )}
 
+              </div>
+
+            )}
+
           </div>
 
         </section>
@@ -3216,52 +3343,10 @@ function App() {
 
                     {matches.map(
                       (donor) => (
-
-                        <div
-                          className="match-card"
+                        <SmartMatchCard
                           key={donor.id}
-                        >
-
-                          <div className="match-avatar">
-                            🩸
-                          </div>
-
-
-                          <div className="match-info">
-
-                            <strong>
-                              {donor.name}
-                            </strong>
-
-                            <span>
-                              {donor.blood_group}
-                              {" · "}
-                              {donor.city}
-                            </span>
-
-                            <small>
-                              {donor.distance_km} km away
-                            </small>
-
-
-                            {donor.match_reason && (
-
-                              <small>
-                                ✓{" "}
-                                {donor.match_reason}
-                              </small>
-
-                            )}
-
-                          </div>
-
-
-                          <span className="available-badge">
-                            Available
-                          </span>
-
-                        </div>
-
+                          donor={donor}
+                        />
                       )
                     )}
 
@@ -3587,6 +3672,59 @@ function App() {
         </section>
 
       )}
+
+      {/* ==================================================
+          ELIGIBILITY CHECKER MODAL
+      ================================================== */}
+      <EligibilityCheckerModal
+        isOpen={showEligibilityModal}
+        onClose={() => setShowEligibilityModal(false)}
+        onBecomeDonor={openDonorForm}
+      />
+
+
+      {/* ==================================================
+          DONATION HISTORY MODAL
+      ================================================== */}
+      <DonationHistoryModal
+        isOpen={showDonationHistoryModal}
+        onClose={() => setShowDonationHistoryModal(false)}
+        donorName={currentUser?.full_name || "Volunteer Donor"}
+      />
+
+
+      {/* ==================================================
+          YOUR IMPACT DASHBOARD MODAL
+      ================================================== */}
+      <ImpactDashboardModal
+        isOpen={showImpactModal}
+        onClose={() => setShowImpactModal(false)}
+        donorStats={{
+          donations: 7,
+          livesImpacted: 21,
+          emergencyResponses: 4,
+        }}
+      />
+
+
+      {/* ==================================================
+          BLOOD BANK LOCATOR MODAL
+      ================================================== */}
+      <BloodBankLocatorModal
+        isOpen={showBloodBanksModal}
+        onClose={() => setShowBloodBanksModal(false)}
+      />
+
+
+      {/* ==================================================
+          NOTIFICATION CENTER MODAL
+      ================================================== */}
+      <NotificationCenterModal
+        isOpen={showNotificationsModal}
+        onClose={() => setShowNotificationsModal(false)}
+        onOpenDashboard={openDashboard}
+        onOpenImpact={() => setShowImpactModal(true)}
+      />
 
     </div>
   );
