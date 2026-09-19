@@ -32,6 +32,7 @@ app.add_middleware(
        "http://127.0.0.1:5173",
        "https://blood-bridge-1phv74cx9-pr-dd6d.vercel.app",
        "https://blood-bridge-pink.vercel.app",
+       "https://blood-bridge-eyftyqtr2-pr-dd6d.vercel.app",
     ],
     allow_credentials=False,
     allow_methods=["*"],
