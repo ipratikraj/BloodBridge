@@ -1,5 +1,4 @@
-const API_BASE_URL = "https://bloodbridge-1-elsg.onrender.com";
-
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 // ======================================================
 // ACCESS TOKEN
 // ======================================================
