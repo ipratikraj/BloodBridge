@@ -537,7 +537,6 @@ Important security practices for a production deployment would include:
 * Regular dependency updates
 * Protection of sensitive medical/personal information
 
-> Never commit real API keys, database passwords, JWT secrets or other sensitive production credentials to the repository.
 
 ---
 
@@ -643,55 +642,10 @@ The application was tested across major workflows including:
 * Error handling
 * Frontend/backend communication
 
----
-
-# 📸 Screenshots
-
-Screenshots of the application can be added here to showcase the implemented interface.
-
-Recommended screenshots:
-
-1. Landing Page
-2. Login / Registration
-3. Donor Dashboard
-4. Blood Request Form
-5. Smart Matching Results
-6. Donation History
-7. Impact Dashboard
-8. Eligibility Checker
-9. Blood Bank / Hospital Locator
-10. Notification Center
-11. Admin Analytics Dashboard
-
-Example:
-
-```markdown
-![BloodBridge Dashboard](./screenshots/dashboard.png)
-```
 
 ---
 
-# 📁 Environment Configuration
 
-The application uses environment variables for configuration.
-
-### Frontend
-
-Local development:
-
-```text
-VITE_API_BASE_URL=http://127.0.0.1:8000
-```
-
-Production:
-
-```text
-VITE_API_BASE_URL=https://bloodbridge-1-elsg.onrender.com
-```
-
-> Do not commit private secrets or sensitive environment variables to GitHub.
-
----
 
 # 🤝 Project Purpose
 
